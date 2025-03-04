@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interactive Timeline Map</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Chart.js for pie chart -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    :root {
+      --primary-bg: #111;          /* Dark background */
+      --primary-fg: #ffffff;        /* White text */
+      --accent-color: #BADA55;      /* Bright lime accent */
+      --heading-font: sans-serif;
+      --body-font: Arial, sans-serif;
+      --panel-bg: #1A1A1A;          /* Panel background */
+      --base-font-size: 20px;       /* Increased base font size */
+      --heading-size: 2.5rem;       /* Increased heading size */
+      --subheading-size: 2rem;      /* Increased subheading size */
+    }
+    /* Base styles */
+    body {
+      margin: 0;
+      background-color: var(--primary-bg);
+      color: var(--primary-fg);
+      font-family: var(--body-font);
+      font-size: var(--base-font-size);
+      line-height: 1.5;
+    }
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      background: var(--panel-bg);
+      padding: 3rem 2rem;
+    }
+    .hero h2 {
+      color: var(--accent-color);
+      font-size: var(--heading-size);
+      margin-bottom: 1rem;
+      font-family: var(--heading-font);
+    }
+    .hero p {
+      max-width: 800px;
+      margin: 0 auto 1rem auto;
+      font-size: 1.5rem;
+    }
+    /* Main container split into two columns */
+    main {
+      display: flex;
+      flex-wrap: wrap;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      gap: 2rem;
+    }
+    /* Left column for controls */
+    .leftColumn {
+      flex: 1 1 300px;
+      background: var(--panel-bg);
+      padding: 1rem 1.5rem;
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+    /* Right column for the map */
+    .rightColumn {
+      flex: 2 1 600px;
+    }
+    /* Panel styling for inputs/buttons */
+    .panel {
+      margin-bottom: 1.5rem;
+    }
+    .panel label,
+    .panel h3 {
+      color: var(--accent-color);
+      font-family: var(--heading-font);
+      margin: 0.5rem 0;
+      font-size: 1.4rem;
+    }
+    input[type="text"],
+    button,
+    input[type="range"] {
+      display: block;
+      margin: 0.5rem 0;
+      padding: 12px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: none;
+      font-size: 1.2rem;
+    }
+    button {
+      background: var(--accent-color);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background: #cfff6a;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      background: #333;
+    }
+    /* Timeline slider container */
+    .sliderContainer {
+      margin-bottom: 1rem;
+    }
+    .sliderContainer span {
+      color: var(--accent-color);
+      font-weight: bold;
+      font-size: 1.4rem;
+    }
+    /* Map container styling */
+    #map {
+      width: 100%;
+      height: 800px; /* Increased height */
+      border: 2px solid #fff; /* White border */
+      border-radius: 4px;
+    }
+    /* Status message */
+    #statusMessage {
+      margin: 0.5rem 0;
+      font-style: italic;
+      font-size: 1.3rem;
+    }
+    /* Modal styling without an "x" button */
+    #artifactDetails {
+      display: none;
+      position: fixed;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      max-width: 1000px;
+      max-height: 80%;
+      overflow-y: auto;
+      background: var(--panel-bg);
+      border: 1px solid #333;
+      padding: 20px;
+      z-index: 1000;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      font-size: 1.2rem;
+    }
+    #artifactDetails h2 {
+      color: var(--accent-color);
+      margin-top: 0;
+      font-family: var(--heading-font);
+      font-size: var(--subheading-size);
+      padding-right: 2.5rem; /* Reserve space for the close trigger */
+    }
+    
+    /* Detail flex container for list and chart */
+    .detail-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    #artifactList {
+      flex: 1 1 500px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    
+    #chartContainer {
+      flex: 1 1 400px;
+      max-height: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    #pieChart {
+      width: 100%;
+      height: 400px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    
+    #chartTitle {
+      color: var(--accent-color);
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    
+    /* Info icon and tooltip styling */
+    .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: var(--accent-color);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 10px;
+      font-size: 16px;
+      vertical-align: middle;
+    }
+    
+    #tokenInfoPopup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 500px;
+      background: var(--panel-bg);
+      border: 2px solid var(--accent-color);
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 2000;
+      box-shadow: 0 0 20px rgba(0,0,0,0.7);
+      line-height: 1.6;
+    }
+    
+    #tokenInfoPopup h3 {
+      color: var(--accent-color);
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    #tokenInfoPopup ol {
+      margin: 15px 0;
+      padding-left: 20px;
+    }
+    
+    #tokenInfoPopup li {
+      margin-bottom: 10px;
+    }
+    
+    #tokenInfoPopup a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+    
+    #tokenInfoPopup a:hover {
+      text-decoration: underline;
+    }
+    
+    .close-popup {
+      display: block;
+      margin-top: 15px;
+      padding: 8px 15px;
+      background: var(--accent-color);
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    /* Footer styling */
+    footer {
+      background: #000;
+      color: var(--primary-fg);
+      text-align: center;
+      padding: 1rem 0;
+      margin-top: 2rem;
+      font-size: 1.2rem;
+    }
+    footer p {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hero Section -->
+  <section class="hero">
+    <h2>Interactive Timeline Map</h2>
+    <p>
+      Explore where artefacts across time are stored at UK museums.
+    </p>
+  </section>
+
+  <!-- Main container split into two columns -->
+  <main>
+    <!-- Left Column: Controls -->
+    <div class="leftColumn">
+      <!-- Data fetching panel -->
+      <div class="panel">
+        <label for="apiToken">Enter API Token: <span class="info-icon" id="infoBtn">i</span></label>
+        <input type="text" id="apiToken" placeholder="API token" value="MPribmB-smF3xhyyc2ZV95m1TjKy3J1l7OaYH6duAm00L8v0fU/PgAIbBzwBtQHWGcGrMXjgNkAdt5Ysz70PLf51u0RTJd/dKGgd5-BpHQSNwOGeAv8gUbL5boUxvEgCY9QDvN4EWf/HBl0XdCSy7LIo4tZdJL0rNxApxYmjSITqDG-EAnro3letRvfAPr9y8buTY60YEzUUqOTwhi8xMyxfwMgjqUa7LLSRPiCUFVKg9E-x87-u5qKwqcP5QR1GCVHu53DsseK6N2TO19N9uf3E5nenGkXXceJoruskE8-f8YcmnDE6TI9srl5/kxwXXNZCxT2Afl1lIBSjhcWjY2sOjeyPArq/I740bsdFxQZ5S25fRA-5/iCbdmlMkd5m" />
+        <button id="fetchMergeBtn">Create Timeline</button>
+        <p id="statusMessage"></p>
+      </div>
+      <!-- Timeline slider panel -->
+      <div class="panel sliderContainer">
+        <label for="yearSlider">Select Year: <span id="yearDisplay">1000</span></label>
+        <input type="range" id="yearSlider" min="1000" value="1000" step="10" />
+      </div>
+    </div>
+    <!-- Right Column: Map -->
+    <div class="rightColumn">
+      <div id="map"></div>
+    </div>
+  </main>
+
+  <!-- Modified Modal for artifact details with added pie chart -->
+  <div id="artifactDetails">
+    <h2>Artifacts at this location</h2>
+    <div class="detail-container">
+      <div id="artifactList"></div>
+      <div id="chartContainer">
+        <h3 id="chartTitle">Artefacts Distribution</h3>
+        <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Info popup for API Token instructions -->
+  <div id="tokenInfoPopup">
+    <h3>How to Get Your API Token</h3>
+    <p>Follow these steps to obtain an API token for exploring artifacts in UK museums:</p>
+    <ol>
+      <li>Visit the <a href="https://museumdata.uk/" target="_blank">Museum Data Service</a> website</li>
+      <li>Click on "Search Objects" in the navigation menu</li>
+      <li>In the search box, enter a country name (like "Egypt" or "China") to find artifacts from that region</li>
+      <li>Click on "Filters" and select "Object Production Place" to refine your search</li>
+      <li>Scroll to the bottom right of the page and click on "Get an API token"</li>
+      <li>Copy the generated token and paste it into the field in this application</li>
+    </ol>
+    <p>This will allow you to visualize where artifacts from your selected country are displayed across different UK museums over time.</p>
+    <button class="close-popup" id="closePopupBtn">Close</button>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 Museum Data Service</p>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    /* ------------------------------------------------------------
+       JavaScript logic for:
+       - Fetching and processing data from MDS API
+       - Using embedded coordinates instead of loading from JSON file
+       - Timeline-based marker display with a one-time animation
+       - Pie chart visualization of object types based on first noun in description
+       ------------------------------------------------------------ */
+
+    // Global variables
+    let artifacts = [];        // Merged data with coordinates
+    let artifactGroups = {};   // Groups artifacts by coordinate key
+    let markersLayer = L.layerGroup();
+    let pieChartInstance = null; // To store the chart instance for updating
+
+    // Embedded coordinates data (from coordinates.json)
+    const coordinates = [
+      {
+        "name": "Victoria and Albert Museum",
+        "coordinates": {
+          "latitude": 51.4966,
+          "longitude": -0.1722
+        }
+      },
+      {
+        "name": "Amgueddfa Cymru - Museum Wales",
+        "coordinates": {
+          "latitude": 51.4860,
+          "longitude": -3.1790
+        }
+      },
+      {
+        "name": "Nottingham Museums",
+        "coordinates": {
+          "latitude": 52.9474,
+          "longitude": -1.1546
+        }
+      },
+      {
+        "name": "Science Museum Group",
+        "coordinates": {
+          "latitude": 51.497223,
+          "longitude": -0.176821
+        }
+      },
+      {
+        "name": "Norfolk Museums",
+        "coordinates": {
+          "latitude": 52.6286,
+          "longitude": 1.2970
+        }
+      },
+      {
+        "name": "Ashmolean Museum",
+        "coordinates": {
+          "latitude": 51.7544,
+          "longitude": -1.2540
+        }
+      },
+      {
+        "name": "Fitzwilliam Museum",
+        "coordinates": {
+          "latitude": 52.200278,
+          "longitude": 0.119444
+        }
+      },
+      {
+        "name": "Jersey Heritage",
+        "coordinates": {
+          "latitude": 49.1889,
+          "longitude": -2.1039
+        }
+      },
+      {
+        "name": "Dorset Museum & Art Gallery",
+        "coordinates": {
+          "latitude": 50.7100,
+          "longitude": -2.4380
+        }
+      },
+      {
+        "name": "Culture Perth & Kinross",
+        "coordinates": {
+          "latitude": 56.3970,
+          "longitude": -3.4300
+        }
+      },
+      {
+        "name": "Aberdeen Archives, Gallery and Museums",
+        "coordinates": {
+          "latitude": 57.1497,
+          "longitude": -2.0943
+        }
+      },
+      {
+        "name": "University of Aberdeen Collections",
+        "coordinates": {
+          "latitude": 57.1497,
+          "longitude": -2.0943
+        }
+      },
+      {
+        "name": "Wiltshire Museum",
+        "coordinates": {
+          "latitude": 51.2250,
+          "longitude": -1.9870
+        }
+      },
+      {
+        "name": "Internal Fire Museum of Power",
+        "coordinates": {
+          "latitude": 52.4082,
+          "longitude": -1.5105
+        }
+      },
+      {
+        "name": "Horniman Museum and Gardens",
+        "coordinates": {
+          "latitude": 51.437664,
+          "longitude": -0.061111
+        }
+      },
+      {
+        "name": "Potteries Museum & Art Gallery",
+        "coordinates": {
+          "latitude": 53.0027,
+          "longitude": -2.1794
+        }
+      },
+      {
+        "name": "Bradford District Museums and Galleries",
+        "coordinates": {
+          "latitude": 53.7950,
+          "longitude": -1.7594
+        }
+      },
+      {
+        "name": "National Museums Northern Ireland",
+        "coordinates": {
+          "latitude": 54.5973,
+          "longitude": -5.9301
+        }
+      },
+      {
+        "name": "Thackray Museum of Medicine",
+        "coordinates": {
+          "latitude": 53.8008,
+          "longitude": -1.5559
+        }
+      },
+      {
+        "name": "Poole Museum",
+        "coordinates": {
+          "latitude": 50.7118,
+          "longitude": -1.9802
+        }
+      },
+      {
+        "name": "University of Dundee Museums",
+        "coordinates": {
+          "latitude": 56.4620,
+          "longitude": -2.9707
+        }
+      },
+      {
+        "name": "Craven Museum",
+        "coordinates": {
+          "latitude": 53.9660,
+          "longitude": -1.7710
+        }
+      },
+      {
+        "name": "Culture Coventry",
+        "coordinates": {
+          "latitude": 52.4082,
+          "longitude": -1.5105
+        }
+      },
+      {
+        "name": "Trowbridge Museum",
+        "coordinates": {
+          "latitude": 51.3200,
+          "longitude": -2.2050
+        }
+      },
+      {
+        "name": "University of St Andrews",
+        "coordinates": {
+          "latitude": 56.3400,
+          "longitude": -2.7960
+        }
+      },
+      {
+        "name": "Leicester Museums and Galleries",
+        "coordinates": {
+          "latitude": 52.6369,
+          "longitude": -1.1398
+        }
+      },
+      {
+        "name": "Royal Albert Memorial Museum & Art Gallery",
+        "coordinates": {
+          "latitude": 50.7167,
+          "longitude": -3.5333
+        }
+      },
+      {
+        "name": "Cyfarthfa Castle Museum & Art Gallery",
+        "coordinates": {
+          "latitude": 51.7440,
+          "longitude": -3.3710
+        }
+      },
+      {
+        "name": "Aberystwyth University, School of Art Museum & Gallery",
+        "coordinates": {
+          "latitude": 52.4153,
+          "longitude": -4.0826
+        }
+      },
+      {
+        "name": "Armagh Observatory & Planetarium",
+        "coordinates": {
+          "latitude": 54.3500,
+          "longitude": -6.6500
+        }
+      },
+      {
+        "name": "Armagh County Museum",
+        "coordinates": {
+          "latitude": 54.3500,
+          "longitude": -6.6500
+        }
+      },
+      {
+        "name": "Keswick Museum and Art Gallery",
+        "coordinates": {
+          "latitude": 54.6000,
+          "longitude": -3.1300
+        }
+      },
+      {
+        "name": "Swindon Museums (Swindon Borough Council)",
+        "coordinates": {
+          "latitude": 51.5685,
+          "longitude": -1.7722
+        }
+      },
+      {
+        "name": "Wotton-under-Edge Heritage Centre",
+        "coordinates": {
+          "latitude": 51.6217,
+          "longitude": -2.2691
+        }
+      },
+      {
+        "name": "Teign Heritage Centre",
+        "coordinates": {
+          "latitude": 50.5230,
+          "longitude": -3.6000
+        }
+      },
+      {
+        "name": "National Army Museum",
+        "coordinates": {
+          "latitude": 51.4928,
+          "longitude": -0.1343
+        }
+      },
+      {
+        "name": "The Royal Mint Museum",
+        "coordinates": {
+          "latitude": 51.5840,
+          "longitude": -3.2330
+        }
+      },
+      {
+        "name": "Ravenglass Railway Museum",
+        "coordinates": {
+          "latitude": 54.4040,
+          "longitude": -3.3640
+        }
+      },
+      {
+        "name": "Hackney Museum",
+        "coordinates": {
+          "latitude": 51.5450,
+          "longitude": -0.0550
+        }
+      },
+      {
+        "name": "Saltaire Collection",
+        "coordinates": {
+          "latitude": 53.8500,
+          "longitude": -1.8900
+        }
+      },
+      {
+        "name": "Grampian Hospitals Art Trust",
+        "coordinates": {
+          "latitude": 57.1497,
+          "longitude": -2.0943
+        }
+      },
+      {
+        "name": "Loughborough Carillon Tower and War Memorial Museum",
+        "coordinates": {
+          "latitude": 52.7717,
+          "longitude": -1.2100
+        }
+      },
+      {
+        "name": "Aldbourne Heritage Centre",
+        "coordinates": {
+          "latitude": 51.3111,
+          "longitude": -1.7000
+        }
+      },
+      {
+        "name": "Fry Art Gallery",
+        "coordinates": {
+          "latitude": 52.0333,
+          "longitude": 0.2000
+        }
+      },
+      {
+        "name": "National Gallery",
+        "coordinates": {
+          "latitude": 51.5089,
+          "longitude": -0.1283
+        }
+      },
+      {
+        "name": "Port Sunlight Museum",
+        "coordinates": {
+          "latitude": 53.3570,
+          "longitude": -2.9910
+        }
+      },
+      {
+        "name": "Nature in Art",
+        "coordinates": {
+          "latitude": 51.1833,
+          "longitude": -0.7000
+        }
+      },
+      {
+        "name": "Haynes Motor Museum",
+        "coordinates": {
+          "latitude": 51.0550,
+          "longitude": -2.8900
+        }
+      },
+      {
+        "name": "Little Hall Lavenham",
+        "coordinates": {
+          "latitude": 52.0750,
+          "longitude": 0.8500
+        }
+      },
+      {
+        "name": "Clifton Suspension Bridge Museum",
+        "coordinates": {
+          "latitude": 51.4550,
+          "longitude": -2.6100
+        }
+      },
+      {
+        "name": "STORIEL",
+        "coordinates": {
+          "latitude": 51.5200,
+          "longitude": -0.1000
+        }
+      },
+      {
+        "name": "The Armitt",
+        "coordinates": {
+          "latitude": 54.4287,
+          "longitude": -3.0725
+        }
+      },
+      {
+        "name": "The Priseman Seabrook Collection",
+        "coordinates": {
+          "latitude": 51.5074,
+          "longitude": -0.1278
+        }
+      },
+      {
+        "name": "Heugh Battery Museum",
+        "coordinates": {
+          "latitude": 54.6820,
+          "longitude": -1.2090
+        }
+      },
+      {
+        "name": "Museum of Cardiff",
+        "coordinates": {
+          "latitude": 51.4816,
+          "longitude": -3.1815
+        }
+      },
+      {
+        "name": "Brunel Museum",
+        "coordinates": {
+          "latitude": 51.5033,
+          "longitude": -0.0183
+        }
+      },
+      {
+        "name": "Bawdsey Radar",
+        "coordinates": {
+          "latitude": 52.1850,
+          "longitude": 1.5010
+        }
+      },
+      {
+        "name": "National Tramway Museum",
+        "coordinates": {
+          "latitude": 53.0610,
+          "longitude": -1.4890
+        }
+      },
+      {
+        "name": "Ilfracombe Museum",
+        "coordinates": {
+          "latitude": 51.1970,
+          "longitude": -4.1140
+        }
+      }
+    ];
+
+    // One-time Animation: moves the slider from its initial value to 2025 once.
+    function runOneTimeAnimation() {
+      const sliderMax = parseInt(yearSlider.max);
+      let currentYear = parseInt(yearSlider.value);
+      const animationDuration = 5000; // total duration in ms for the one-time animation
+      const steps = Math.ceil((sliderMax - currentYear) / 10);
+      const stepInterval = animationDuration / steps;
+      const intervalId = setInterval(() => {
+        currentYear += 10;
+        if (currentYear >= sliderMax) {
+          currentYear = sliderMax;
+          clearInterval(intervalId);
+        }
+        yearSlider.value = currentYear;
+        yearDisplay.textContent = currentYear;
+        updateMarkers(currentYear);
+      }, stepInterval);
+    }
+
+    // Initialize Leaflet map with full interaction enabled
+    const map = L.map('map', {
+      zoomControl: true,
+      dragging: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      touchZoom: true
+    }).setView([55, -3], 6);
+    const ukBounds = L.latLngBounds([50, -8], [61, 2]);
+    map.setMaxBounds(ukBounds);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    markersLayer.addTo(map);
+
+    // Close the artifact details modal when any marker popup is closed.
+    map.on('popupclose', function() {
+      artifactDetails.style.display = 'none';
+    });
+
+    // DOM elements
+    const yearSlider = document.getElementById('yearSlider');
+    const yearDisplay = document.getElementById('yearDisplay');
+    const artifactDetails = document.getElementById('artifactDetails');
+    const artifactList = document.getElementById('artifactList');
+    const statusMessage = document.getElementById('statusMessage');
+    const fetchMergeBtn = document.getElementById('fetchMergeBtn');
+    const pieChartCanvas = document.getElementById('pieChart');
+
+    /* --- Data Fetching & Merging Functions --- */
+    const baseUrl = "https://mds-data-1.ciim.k-int.com/api/v1/extract?resume=";
+    
+    async function fetchAllRecords(apiToken) {
+      let allRecords = [];
+      let token = apiToken;
+      let hasNext = true;
+      while (hasNext) {
+        try {
+          const response = await fetch(baseUrl + encodeURIComponent(token));
+          if (!response.ok) {
+            console.error("Network response was not ok", response.statusText);
+            break;
+          }
+          const json = await response.json();
+          if (json.data && Array.isArray(json.data)) {
+            allRecords = allRecords.concat(json.data);
+          }
+          if (json.resume) {
+            token = json.resume;
+          } else {
+            hasNext = false;
+          }
+        } catch (err) {
+          console.error("Error fetching records:", err);
+          hasNext = false;
+        }
+      }
+      return allRecords;
+    }
+
+    function processRecords(rawData) {
+      const mappedData = rawData.map(item => {
+        const admin = item["@admin"] || {};
+        const doc = item["@document"] || {};
+        const outputObj = {};
+
+        outputObj.id = admin.id || "";
+        let name = "";
+        let title = "";
+        if (doc.units && Array.isArray(doc.units)) {
+          const nameUnits = doc.units.filter(u => u.label === "Object Name");
+          const simpleUnit = nameUnits.find(u =>
+            u.units && Array.isArray(u.units) &&
+            u.units.some(sub => sub.label === "Object Name Type" && sub.value.toLowerCase() === "simple")
+          );
+          if (simpleUnit) {
+            name = simpleUnit.value || "";
+          } else if (nameUnits.length > 0) {
+            name = nameUnits[0].value || "";
+          }
+          const classifiedUnit = nameUnits.find(u =>
+            u.units && Array.isArray(u.units) &&
+            u.units.some(sub => sub.label === "Object Name Type" && sub.value.toLowerCase().includes("classified"))
+          );
+          title = classifiedUnit ? classifiedUnit.value || "" : name;
+        }
+        outputObj.name = name;
+        outputObj.title = title;
+
+        let description = "";
+        if (doc.units && Array.isArray(doc.units)) {
+          const descUnit = doc.units.find(u => u.label === "Brief Description");
+          description = descUnit ? descUnit.value || "" : "";
+        }
+        outputObj.description = description;
+
+        let prodDate = "";
+        if (doc.units && Array.isArray(doc.units)) {
+          const prodDateUnit = doc.units.find(u => u.label === "Object Production Date");
+          if (prodDateUnit) {
+            let dateStr = "";
+            if (prodDateUnit.units && Array.isArray(prodDateUnit.units)) {
+              const earliestSub = prodDateUnit.units.find(sub => sub.label && sub.label.toLowerCase().includes("earliest") && sub.value);
+              dateStr = earliestSub ? earliestSub.value.toString() : (prodDateUnit.value ? prodDateUnit.value.toString() : "");
+            } else {
+              dateStr = prodDateUnit.value ? prodDateUnit.value.toString() : "";
+            }
+            const match = dateStr.match(/\b([12]\d{3})\b/);
+            prodDate = match ? match[1] : "";
+          }
+        }
+        outputObj.objectProductionDate = prodDate;
+
+        let collection = "";
+        if (admin.data_source && admin.data_source.name) {
+          collection = admin.data_source.name;
+          let indexSlash = collection.indexOf("/");
+          let indexDash = collection.indexOf("-");
+          let index = -1;
+          if (indexSlash >= 0 && indexDash >= 0) {
+            index = Math.min(indexSlash, indexDash);
+          } else if (indexSlash >= 0) {
+            index = indexSlash;
+          } else if (indexDash >= 0) {
+            index = indexDash;
+          }
+          if (index > 0) {
+            collection = collection.substring(0, index);
+          }
+          collection = collection.trim();
+        }
+        outputObj.collection = collection;
+
+        return outputObj;
+      });
+      return mappedData.filter(item =>
+        item.id && item.name && item.title && item.description &&
+        item.objectProductionDate && item.collection
+      );
+    }
+
+    // Modified to use embedded coordinates instead of fetching from a file
+    function mergeWithCoordinates(processed) {
+      try {
+        const coordLookup = {};
+        coordinates.forEach(item => {
+          coordLookup[item.name.toLowerCase()] = item.coordinates;
+        });
+        return processed.map(item => {
+          const coords = coordLookup[item.collection.toLowerCase()] || null;
+          return { ...item, coordinates: coords };
+        });
+      } catch (error) {
+        console.error("Error merging coordinates:", error);
+        return processed;
+      }
+    }
+
+    /* --- Natural Language Processing for Nouns --- */
+    // Function to extract the first noun from a description
+    function extractFirstNoun(description) {
+      if (!description) return 'Unknown';
+      
+      // List of common nouns that might appear in museum artifacts
+      const commonNouns = [
+        'painting', 'sculpture', 'pottery', 'ceramic', 'vase', 'statue', 'bowl',
+        'cup', 'plate', 'dish', 'ornament', 'jewelry', 'coin', 'medal', 'tool',
+        'instrument', 'garment', 'textile', 'mask', 'carving', 'manuscript',
+        'document', 'book', 'map', 'photograph', 'print', 'drawing', 'weapon',
+        'armour', 'clock', 'watch', 'furniture', 'box', 'container', 'figurine',
+        'doll', 'toy', 'vessel', 'jug', 'pot', 'basket', 'rug', 'carpet', 'tapestry',
+        'glass', 'stone', 'metal', 'wood', 'cloth', 'paper', 'leather', 'gold',
+        'silver', 'bronze', 'iron', 'porcelain', 'jade', 'ivory', 'pearl', 'crystal',
+        'ruby', 'emerald', 'diamond', 'amethyst', 'fragment', 'piece', 'artifact', 'relic'
+      ];
+      
+      // Simple approach: find the first common noun in the description
+      const words = description.toLowerCase().split(/\s+/);
+      for (let i = 0; i < words.length; i++) {
+        // Clean the word of punctuation
+        const cleanWord = words[i].replace(/[^\w]/g, '');
+        if (commonNouns.includes(cleanWord)) {
+          return cleanWord;
+        }
+      }
+      
+      // Fallback to first word or title if no common noun is found
+      return 'Other';
+    }
+
+    /* --- Pie Chart Creation --- */
+    function createPieChart(artifacts) {
+      // Extract nouns from descriptions
+      const nounMap = {};
+      artifacts.forEach(artifact => {
+        const noun = extractFirstNoun(artifact.description);
+        nounMap[noun] = (nounMap[noun] || 0) + 1;
+      });
+      
+      // Convert to array and sort by count
+      const nounData = Object.entries(nounMap)
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Take top 8 categories and group the rest as "Other"
+      let chartData;
+      if (nounData.length > 8) {
+        const topCategories = nounData.slice(0, 7);
+        const otherCount = nounData.slice(7).reduce((sum, item) => sum + item.count, 0);
+        chartData = [...topCategories, { label: 'Other', count: otherCount }];
+      } else {
+        chartData = nounData;
+      }
+      
+      // Use a colorblind-friendly palette (Okabe-Ito palette)
+      const colorblindFriendlyPalette = [
+        '#56B4E9', // Sky Blue
+        '#009E73', // Bluish Green
+        '#F0E442', // Yellow
+        '#0072B2', // Blue
+        '#D55E00', // Vermilion
+        '#CC79A7', // Reddish Purple
+        '#E69F00', // Orange
+        '#999999'  // Gray
+      ];
+      
+      // Assign a color from the palette to each category
+      const backgroundColors = chartData.map((_, index) => {
+        return colorblindFriendlyPalette[index % colorblindFriendlyPalette.length];
+      });
+      
+      // Destroy existing chart if it exists
+      if (pieChartInstance) {
+        pieChartInstance.destroy();
+      }
+      
+      // Create new chart
+      const ctx = pieChartCanvas.getContext('2d');
+      pieChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: chartData.map(item => item.label),
+          datasets: [{
+            data: chartData.map(item => item.count),
+            backgroundColor: backgroundColors,
+            borderColor: 'rgba(0, 0, 0, 0.1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color: 'white',
+                font: {
+                  size: 18
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw || 0;
+                  const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    /* --- Timeline Map --- */
+    function updateMarkers(selectedYear) {
+      markersLayer.clearLayers();
+      artifactGroups = {};
+      artifacts.forEach(artifact => {
+        let year = parseInt(artifact.objectProductionDate);
+        if (isNaN(year)) return;
+        if (year <= selectedYear && artifact.coordinates &&
+            artifact.coordinates.latitude && artifact.coordinates.longitude) {
+          const lat = artifact.coordinates.latitude;
+          const lon = artifact.coordinates.longitude;
+          const key = lat.toFixed(6) + ',' + lon.toFixed(6);
+          if (!artifactGroups[key]) {
+            artifactGroups[key] = [];
+          }
+          artifactGroups[key].push(artifact);
+        }
+      });
+      for (let key in artifactGroups) {
+        const [lat, lon] = key.split(',').map(Number);
+        const group = artifactGroups[key];
+        const collections = [...new Set(group.map(a => a.collection))].join(', ');
+        const radius = 20 + Math.log(group.length);
+        const color = stringToColor(key);
+        const circleMarker = L.circleMarker([lat, lon], {
+          radius: radius,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.5
+        });
+        circleMarker.bindPopup(
+          "Collection: " + collections + "<br/>" +
+          group.length + " artifact(s) here.<br/>" +
+          "<button onclick='showArtifactDetails(\"" + key + "\")'>View Details</button>"
+        );
+        markersLayer.addLayer(circleMarker);
+      }
+    }
+
+    function stringToColor(str) {
+      var hash = 0;
+      for (var i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      var color = '#';
+      for (var i = 0; i < 3; i++) {
+        var value = (hash >> (i * 8)) & 0xFF;
+        color += ('00' + value.toString(16)).substr(-2);
+      }
+      return color;
+    }
+
+    /* --- Event Listeners --- */
+    // Update markers when the slider is moved manually.
+    yearSlider.addEventListener('input', (event) => {
+      const selectedYear = parseInt(event.target.value);
+      yearDisplay.textContent = selectedYear;
+      updateMarkers(selectedYear);
+    });
+
+    // When a marker popup closes, also close the artifact details modal.
+    map.on('popupclose', function() {
+      artifactDetails.style.display = 'none';
+    });
+
+    // Enhanced function to show artifacts and create pie chart
+    function showArtifactDetails(key) {
+      const group = artifactGroups[key];
+      if (!group) return;
+      
+      let html = "<ul>";
+      group.forEach(artifact => {
+        html += `<li>
+          <strong>${artifact.title}</strong> (${artifact.objectProductionDate})<br/>
+          ${artifact.description}<br/>
+          <em>Collection: ${artifact.collection}</em>
+        </li>`;
+      });
+      html += "</ul>";
+      artifactList.innerHTML = html;
+      
+      // Create the pie chart based on the artifacts
+      createPieChart(group);
+      
+      // Show the modal
+      artifactDetails.style.display = 'block';
+    }
+    window.showArtifactDetails = showArtifactDetails;
+    
+    // Info button functionality
+    const infoBtn = document.getElementById('infoBtn');
+    const tokenInfoPopup = document.getElementById('tokenInfoPopup');
+    const closePopupBtn = document.getElementById('closePopupBtn');
+    
+    infoBtn.addEventListener('click', () => {
+      tokenInfoPopup.style.display = 'block';
+    });
+    
+    closePopupBtn.addEventListener('click', () => {
+      tokenInfoPopup.style.display = 'none';
+    });
+    
+    // Close popup when clicking outside of it
+    window.addEventListener('click', (event) => {
+      if (event.target === tokenInfoPopup) {
+        tokenInfoPopup.style.display = 'none';
+      }
+    });
+
+    /* --- Fetch, Process, Merge, and Initialize Timeline --- */
+    fetchMergeBtn.addEventListener("click", async () => {
+      const tokenInput = document.getElementById("apiToken").value.trim();
+      if (!tokenInput) {
+        alert("Please enter your API token.");
+        return;
+      }
+      statusMessage.textContent = "Fetching data...";
+      fetchMergeBtn.disabled = true;
+
+      const rawData = await fetchAllRecords(tokenInput);
+      statusMessage.textContent = "Processing data...";
+      const processed = processRecords(rawData);
+      statusMessage.textContent = "Merging with coordinates...";
+      const merged = mergeWithCoordinates(processed);
+      artifacts = merged;
+      statusMessage.textContent = "Data loaded. Running timeline animation...";
+
+      let years = artifacts.map(a => parseInt(a.objectProductionDate)).filter(year => !isNaN(year));
+      const minYear = 1000;
+      const dataMax = Math.max(...years) > 1000 ? Math.max(...years) : 1000;
+      // Set slider max to 2025 so the animation runs until 2025
+      const maxYear = Math.max(dataMax, 2025);
+      yearSlider.min = minYear;
+      yearSlider.max = maxYear;
+      yearSlider.value = minYear;
+      yearDisplay.textContent = minYear;
+      updateMarkers(minYear);
+
+      runOneTimeAnimation();
+      statusMessage.textContent = "Animation complete. Use the slider to explore any year.";
+      fetchMergeBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
