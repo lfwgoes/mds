@@ -961,7 +961,10 @@
         'doll', 'toy', 'vessel', 'jug', 'pot', 'basket', 'rug', 'carpet', 'tapestry',
         'glass', 'stone', 'metal', 'wood', 'cloth', 'paper', 'leather', 'gold',
         'silver', 'bronze', 'iron', 'porcelain', 'jade', 'ivory', 'pearl', 'crystal',
-        'ruby', 'emerald', 'diamond', 'amethyst', 'fragment', 'piece', 'artifact', 'relic', 'foreign costume and textiles','flower','manual','letter','notebook','phrasebook','relief','coat','color aquatint','spoon','poster','cross','jug','sketch-book','watercolour','card','presses','dress','vessel','stopper','doll','bottle','jacket','charger','stopper','bell','robe','protective charm','lace','wedding veil'
+        'ruby', 'emerald', 'diamond', 'amethyst', 'fragment', 'piece', 'artifact', 'relic', 'foreign costume and textiles',
+        'flower','manual','letter','notebook','phrasebook','relief','coat','color aquatint',
+        'spoon','poster','cross','jug','sketch-book','watercolour','card','presses','dress','vessel',
+        'stopper','doll','bottle','jacket','charger','stopper','bell','robe','protective charm','lace','wedding veil'
       ];
       
       // Simple approach: find the first common noun in the description
@@ -980,26 +983,26 @@
 
     /* --- Pie Chart Creation --- */
     function createPieChart(artifacts) {
-      // Extract nouns from descriptions
-      const nounMap = {};
+      // Use title field for categorization instead of extracting nouns from descriptions
+      const titleMap = {};
       artifacts.forEach(artifact => {
-        const noun = extractFirstNoun(artifact.description);
-        nounMap[noun] = (nounMap[noun] || 0) + 1;
+        const title = artifact.title || 'Unknown';
+        titleMap[title] = (titleMap[title] || 0) + 1;
       });
       
       // Convert to array and sort by count
-      const nounData = Object.entries(nounMap)
+      const titleData = Object.entries(titleMap)
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => b.count - a.count);
       
       // Take top 8 categories and group the rest as "Other"
       let chartData;
-      if (nounData.length > 8) {
-        const topCategories = nounData.slice(0, 7);
-        const otherCount = nounData.slice(7).reduce((sum, item) => sum + item.count, 0);
+      if (titleData.length > 8) {
+        const topCategories = titleData.slice(0, 7);
+        const otherCount = titleData.slice(7).reduce((sum, item) => sum + item.count, 0);
         chartData = [...topCategories, { label: 'Other', count: otherCount }];
       } else {
-        chartData = nounData;
+        chartData = titleData;
       }
       
       // Use a colorblind-friendly palette (Okabe-Ito palette)
